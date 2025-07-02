@@ -2,7 +2,7 @@
 
 # use $TMPDIR as temporary space for improved performance
 
-REQUIRED="git gpg make python3 g++ find tar"
+REQUIRED="git gpg make python3 g++ go find tar"
 NODEVERSION=22.5.1
 YARNVERSION=1.22.22
 
