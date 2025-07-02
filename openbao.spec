@@ -1,28 +1,25 @@
-# Forked from vault.spec by John Boero - jboero@hashicorp.com
+# Loosely based on vault.spec by John Boero - jboero@hashicorp.com
 
-# This can be slightly different than %%{version}.
+# This macro can be slightly different than %%{version}.
 # For example, it has dash instead of tilde for release candidates.
-%global package_version 2.2.0
+%global package_version 2.3.1
 
 %global oldname vault
 
 Name: openbao
-Version: 2.2.0
-Release: 2%{?dist}
+Version: 2.3.1
+Release: 1%{?dist}
 Summary: Openbao is a tool for securely accessing secrets
-License: MPL
+License: MPL-2.0
 Source0: https://github.com/opensciencegrid/%{name}-rpm/archive/v%{package_version}/%{name}-rpm-%{package_version}.tar.gz
-# This is created by ./make-source-tarball
-Source1: %{name}-src-%{package_version}.tar.gz
+# This is created by ./make-source-tarball and included in release assets
+Source1: https://github.com/opensciencegrid/%{name}-rpm/releases/download/v%{package_version}/%{name}-src-%{package_version}.tar.gz
 
 BuildRequires: golang
 Requires(post): systemd
 Requires(preun): systemd
 Requires(postun): systemd
 URL: https://openbao.org
-
-Provides: %{oldname} = %{version}-%{release}
-Obsoletes: %{oldname} < 2.0
 
 # This is to avoid
 #   *** ERROR: No build ID note found
@@ -35,6 +32,16 @@ leasing, key revocation, key rolling, and auditing. Through a unified API, users
 can access an encrypted Key/Value store and network encryption-as-a-service, or
 generate AWS IAM/STS credentials, SQL/NoSQL databases, X.509 certificates, SSH
 credentials, and more.
+
+%package %{oldname}-compat
+Summary: Vault compatibility using OpenBao
+Requires: %{name} = %{version}-%{release}
+Provides: %{oldname} = %{version}-%{release}
+Obsoletes: %{oldname} < 2.0
+
+%description %{oldname}-compat
+Provides a compatability layer on top of OpenBao to emulate a Hashicorp
+Vault package.
 
 %prep
 %setup -q -n %{name}-rpm-%{package_version}
@@ -57,22 +64,22 @@ touch http/web_ui/index.html
 ln -s /bin/true $GOPATH/bin/git
 
 GO_BUILD_GCFLAGS=
-GO_BUILD_LDFLAGS="-X github.com/openbao/openbao/version.fullVersion=%{version}-%{release}"
-GO_BUILD_LDFLAGS+=" -X github.com/openbao/openbao/version.GitCommit="
+GO_BUILD_LDFLAGS="-X github.com/%{name}/%{name}/version.fullVersion=%{version}-%{release}"
+GO_BUILD_LDFLAGS+=" -X github.com/%{name}/%{name}/version.GitCommit="
 BUILD_DATE="$(date --utc +%Y-%m-%dT%H:%M:%SZ)"
-GO_BUILD_LDFLAGS+=" -X github.com/openbao/openbao/version.BuildDate=${BUILD_DATE}"
+GO_BUILD_LDFLAGS+=" -X github.com/%{name}/%{name}/version.BuildDate=${BUILD_DATE}"
 GO_BUILD_TAGS="ui"
 %if "%{?go_debug}" != ""
 # add debugging & testing flags
 GO_BUILD_GCFLAGS="all=-N -l"
-GO_BUILD_LDFLAGS+=" -X github.com/openbao/openbao/version.VersionMetadata=testonly"
+GO_BUILD_LDFLAGS+=" -X github.com/%{name}/%{name}/version.VersionMetadata=testonly"
 # openbao documentation says testonly should not be used for production builds
 GO_BUILD_TAGS+=" testonly"
 %endif
 
 # instructions from https://openbao.org/docs/contributing/packaging/#ui-release
 # The ui release is already pre-built in the source tarball
-go build -gcflags "${GO_BUILD_GCFLAGS}" -ldflags "${GO_BUILD_LDFLAGS}" -o bin/bao -tags "${GO_BUILD_TAGS}"
+go build -gcflags "${GO_BUILD_GCFLAGS}" -ldflags "${GO_BUILD_LDFLAGS}" -buildvcs=false -o bin/bao -tags "${GO_BUILD_TAGS}"
 
 
 %install
@@ -82,16 +89,16 @@ cp -p %{name}-%{package_version}/bin/bao %{buildroot}%{_bindir}/
 ln -s bao %{buildroot}%{_bindir}/%{oldname}
 
 cd ../%{name}-rpm-%{package_version}
-mkdir -p %{buildroot}%{_sysconfdir}/%{oldname}.d
-ln -s %{oldname}.d %{buildroot}%{_sysconfdir}/%{name}.d
-cp -p %{oldname}.hcl %{buildroot}%{_sysconfdir}/%{oldname}.d
+mkdir -p %{buildroot}%{_sysconfdir}/%{name}.d
+cp -p %{name}.hcl %{buildroot}%{_sysconfdir}/%{name}.d
+ln -s %{name}.d %{buildroot}%{_sysconfdir}/%{oldname}.d
 
-mkdir -p %{buildroot}%{_sharedstatedir}/%{oldname}
-ln -s %{oldname} %{buildroot}%{_sharedstatedir}/%{name}
+mkdir -p %{buildroot}%{_sharedstatedir}/%{name}
+ln -s %{name} %{buildroot}%{_sharedstatedir}/%{oldname}
 
 mkdir -p %{buildroot}/usr/lib/systemd/system/
-cp -p %{oldname}.service %{buildroot}/usr/lib/systemd/system/
-ln -s %{oldname}.service %{buildroot}/usr/lib/systemd/system/%{name}.service
+cp -p %{name}.service %{buildroot}/usr/lib/systemd/system/
+ln -s %{name}.service %{buildroot}/usr/lib/systemd/system/%{oldname}.service
 
 %clean
 export GOPATH="`pwd`/gopath"
@@ -102,61 +109,130 @@ rm -rf %{_builddir}/%{name}-*-%{package_version}
 
 %files
 %verify(not caps) %{_bindir}/bao
-%verify(not caps) %{_bindir}/%{oldname}
-%dir %{_sysconfdir}/%{oldname}.d
-%{_sysconfdir}/%{name}.d
-%config(noreplace) %{_sysconfdir}/%{oldname}.d/%{oldname}.hcl
-%attr(0750,%{oldname},%{oldname}) %dir %{_sharedstatedir}/%{oldname}
-%{_sharedstatedir}/%{name}
+%dir %{_sysconfdir}/%{name}.d
+%ghost %{_sysconfdir}/%{oldname}.d.rpmmoved
+%config(noreplace) %{_sysconfdir}/%{name}.d/%{name}.hcl
+%attr(0750,%{name},%{name}) %dir %{_sharedstatedir}/%{name}
+%ghost %{_sharedstatedir}/%{oldname}.rpmmoved
 /usr/lib/systemd/system/%{name}.service
+
+%files %{oldname}-compat
+%{_bindir}/%{oldname}
+%{_sysconfdir}/%{oldname}.d
+%{_sharedstatedir}/%{oldname}
 /usr/lib/systemd/system/%{oldname}.service
 
+# Older versions of this package had opposite symlinks for vault compatability,
+#   and rpm needs help to handle that.
+# See https://fedoraproject.org/wiki/Packaging:Directory_Replacement
+
+%pretrans -p <lua>
+path = "%{_sysconfdir}/%{name}.d"
+st = posix.stat(path)
+if st and st.type == "link" then
+  os.remove(path)
+end
+path = "%{_sharedstatedir}/%{name}"
+st = posix.stat(path)
+if st and st.type == "link" then
+  os.remove(path)
+end
+path = "%{_sysconfdir}/%{oldname}.d"
+st = posix.stat(path)
+if st and st.type == "directory" then
+  status = os.rename(path, path .. ".rpmmoved")
+  if not status then
+    suffix = 0
+    while not status do
+      suffix = suffix + 1
+      status = os.rename(path .. ".rpmmoved", path .. ".rpmmoved." .. suffix)
+    end
+    os.rename(path, path .. ".rpmmoved")
+  end
+end
+path = "%{_sharedstatedir}/%{oldname}"
+st = posix.stat(path)
+if st and st.type == "directory" then
+  status = os.rename(path, path .. ".rpmmoved")
+  if not status then
+    suffix = 0
+    while not status do
+      suffix = suffix + 1
+      status = os.rename(path .. ".rpmmoved", path .. ".rpmmoved." .. suffix)
+    end
+    os.rename(path, path .. ".rpmmoved")
+  end
+end
+
 %pre
-getent group %{oldname} > /dev/null || groupadd -r %{oldname}
-getent passwd %{oldname} > /dev/null || \
-    useradd -r -d %{_sharedstatedir}/%{oldname} -g %{oldname} \
-    -s /sbin/nologin -c "%{name} secret management tool" %{oldname}
+getent group %{name} > /dev/null || groupadd -r %{name}
+getent passwd %{name} > /dev/null || \
+    useradd -r -d %{_sharedstatedir}/%{name} -g %{name} \
+    -s /sbin/nologin -c "%{name} secret management tool" %{name}
 # When the package name changes the old package doesn't see the new one as
 # an upgrade and so it disables the service.  Keep track and re-enable
 # regardless of whether the scriptlet parameter says it is an install
 # or upgrade.
-%global wasenabledfile /var/run/.%{oldname}-was-enabled
+%global wasenabledfile /var/run/.%{name}-was-enabled
 rm -f %{wasenabledfile}
-if systemctl -q is-enabled %{oldname} &>/dev/null; then
+if systemctl -q is-enabled %{name} &>/dev/null; then
     touch %{wasenabledfile}
 fi
 
 # If the service is running, stop it now and restart it after install
-%global wasrunningfile /var/run/.%{oldname}-was-running
+%global wasrunningfile /var/run/.%{name}-was-running
 rm -f %{wasrunningfile}
-if systemctl -q is-active %{oldname} &>/dev/null; then
+if systemctl -q is-active %{name} &>/dev/null; then
     touch %{wasrunningfile}
+    systemctl stop %{name}
 fi
 
 %post
 setcap cap_ipc_lock=+ep %{_bindir}/bao
 systemctl daemon-reload
-%systemd_post %{oldname}.service
+%systemd_post %{name}.service
+# If the %pretrans step above moved the sysconfdir to ".rpmmoved" then
+# the cleanup of the old hcl file will fail, so move it back.
+if [ -f %{_sysconfdir}/%{oldname}.d.rpmmoved/%{oldname}.hcl ]; then
+    if [ ! -L %{_sysconfdir}/%{oldname}.d ]; then
+	# compat package not (yet) installed so create the link
+	# it will be removed in %posttrans if compat package is not installed
+	ln -s %{name}.d %{_sysconfdir}/%{oldname}.d
+    fi
+    mv %{_sysconfdir}/%{oldname}.d.rpmmoved/%{oldname}.hcl %{_sysconfdir}/%{oldname}.d/
+fi
 
 %preun
-%systemd_preun %{oldname}.service
+%systemd_preun %{name}.service
 
 %postun
-%systemd_postun_with_restart %{oldname}.service
+%systemd_postun_with_restart %{name}.service
 
 %posttrans
 if [ -f "%{wasenabledfile}" ]; then
     rm -f %{wasenabledfile}
-    if ! systemctl -q is-enabled %{oldname}; then
-        systemctl enable %{oldname}
+    if ! systemctl -q is-enabled %{name}; then
+        systemctl enable %{name}
     fi
 fi
 if [ -f "%{wasrunningfile}" ]; then
     rm -f %{wasrunningfile}
-    systemctl start %{oldname}
+    systemctl start %{name}
+fi
+if [ -L %{_sysconfdir}/%{oldname}.d ] && [ ! -L %{_sharedstatedir}/%{oldname} ]; then
+    # clean up the temporary symlink created in %post
+    rm %{_sysconfdir}/%{oldname}.d
 fi
 
 %changelog
+* Wed Jul  2 2025 Dave Dykstra <dwd@fnal.gov> 2.3.0-1
+- In preparation for moving to EPEL and Fedora, split vault compatibility
+  out into a separate openbao-vault-compat subpackage.
+  As a result the new package has some incompatibilities and so is not a
+  complete drop-in replacement: it uses an openbao user id and group
+  instead of vault and the default configuration file is called openbao.hcl
+  instead of vault.hcl.
+
 * Mon Apr  7 2025 Dave Dykstra <dwd@fnal.gov> 2.2.0-2
 - Update to use official build instructions, including showing the correct
   version number in the `bao status` command and not using the testonly
