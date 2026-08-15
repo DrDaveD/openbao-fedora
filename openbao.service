@@ -3,7 +3,6 @@ Description="Openbao - A tool for managing secrets"
 Documentation=https://openbao.org/docs/
 Requires=network-online.target
 After=network-online.target
-ConditionFileNotEmpty=/etc/openbao.d/openbao.hcl
 
 [Service]
 User=openbao
@@ -16,7 +15,7 @@ SecureBits=keep-caps
 AmbientCapabilities=CAP_IPC_LOCK
 CapabilityBoundingSet=CAP_SYSLOG CAP_IPC_LOCK
 NoNewPrivileges=yes
-ExecStart=/usr/bin/bao server -config=/etc/openbao.d/openbao.hcl
+ExecStart=/usr/bin/bao server -config=/etc/openbao.d
 ExecReload=/bin/kill --signal HUP $MAINPID
 KillMode=process
 KillSignal=SIGINT
