@@ -75,14 +75,6 @@ while IFS='' read -r LINE; do
         fi
         rm -f $LDEP
         echo "License: $MAINLICENSE AND $LICENSES"
-    elif [[ "$LINE" = *"@GOVERSION@"* ]]; then
-        if [ -f goversion.patch ]; then
-            GOVERSION="$(sed -n 's/^\+go //p' goversion.patch)"
-        else
-            URL="https://raw.githubusercontent.com/$ORG/$PKG/refs/tags/v$VERSION/.go-version"
-            GOVERSION="$(curl -sSL -f -m 15 $URL)"
-        fi
-        echo "$LINE" | sed "s/@GOVERSION@/$GOVERSION/"
     else
         echo "$LINE"
     fi
