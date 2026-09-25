@@ -2,9 +2,6 @@
 
 ui = true
 
-#mlock = true
-#disable_mlock = true
-
 storage "file" {
   path = "/var/lib/openbao/data"
 }
@@ -15,17 +12,17 @@ storage "file" {
 #}
 
 # HTTP listener
-#listener "tcp" {
-#  address = "127.0.0.1:8200"
-#  tls_disable = 1
-#}
+listener "tcp" {
+  address = "127.0.0.1:8200"
+  tls_disable = 1
+}
 
 # HTTPS listener
-listener "tcp" {
-  address       = "0.0.0.0:8200"
-  tls_cert_file = "/etc/openbao.d/tls/tls.crt"
-  tls_key_file  = "/etc/openbao.d/tls/tls.key"
-}
+#listener "tcp" {
+#  address       = "0.0.0.0:8200"
+#  tls_cert_file = "/etc/openbao.d/tls/tls.crt"
+#  tls_key_file  = "/etc/openbao.d/tls/tls.key"
+#}
 
 # Example AWS KMS auto unseal
 #seal "awskms" {
